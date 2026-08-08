@@ -61,7 +61,9 @@ def get_conn():
 
 def ensure_schema(conn):
     with conn.cursor() as cur:
-        cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+        # pgvector extension'ı açıkça public schema'ya kur (search_path güvenliği)
+        cur.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;")
+        cur.execute("SET search_path TO public;")
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS memory (
