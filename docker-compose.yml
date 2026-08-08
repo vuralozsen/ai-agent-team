@@ -16,6 +16,7 @@ services:
     networks:
       - shared-memory-internal
       - dokploy-network
+      - hermes-net
 
   memory-api:
     build:
@@ -39,12 +40,16 @@ services:
     networks:
       - shared-memory-internal
       - dokploy-network
+      - hermes-net
 
 networks:
   shared-memory-internal:
     driver: bridge
   dokploy-network:
     external: true
+  hermes-net:
+    external: true
+    name: hermesorg-hermesorg-fbbmsb_hermes-isolated
 
 volumes:
   shared_memory_pgdata:
