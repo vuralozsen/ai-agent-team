@@ -7,10 +7,12 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 BASE = os.getenv("MEMORY_TEST_URL", "http://localhost:8000")
 KEY = os.getenv("MEMORY_TEST_KEY", "dev-key-1")
 HEADERS = {"Content-Type": "application/json", "X-API-Key": KEY}
+RUN_ID = uuid.uuid4().hex[:8]  # her çalıştırmada unique content -> dedup çakışması yok
 
 passed = 0
 failed = 0
@@ -55,7 +57,7 @@ def main():
     print("== Memory write/read ==")
     s, d = api("POST", "/v1/memory", {
         "project_id": "test-proj-a", "domain": "database", "type": "change",
-        "content": "users tablosuna tenant_id eklendi (test)",
+        "content": f"users tablosuna tenant_id eklendi (test-{RUN_ID})",
         "summary": "multi-tenant test", "source": "test", "agent": "tester",
         "importance": 0.8, "tags": ["postgres", "test"],
     })
@@ -67,7 +69,7 @@ def main():
     print("== Dedup ==")
     s, d = api("POST", "/v1/memory", {
         "project_id": "test-proj-a", "domain": "database", "type": "change",
-        "content": "users tablosuna tenant_id eklendi (test)",
+        "content": f"users tablosuna tenant_id eklendi (test-{RUN_ID})",
         "summary": "güncellendi", "source": "test", "agent": "tester",
     })
     check("dedup detected", s == 200 and d.get("deduplicated") is True, str(d))
