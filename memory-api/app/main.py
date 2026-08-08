@@ -55,7 +55,14 @@ app = FastAPI(title="Shared Memory API", version="1.0.0")
 # ---------------------------------------------------------------------------
 def get_conn():
     conn = psycopg.connect(DATABASE_URL, autocommit=False)
-    register_vector(conn)
+    try:
+        register_vector(conn)
+    except Exception:
+        # vector extension henüz kurulmamış olabilir; ensure_schema() kuracak
+        # ve sonra register_vector'ı tekrar çağıracak. Bu bağlantıda tip
+        # kaydı olmadan da sorgu yapılabilir (yalnızca vector tipi çözümlemesi
+        # gerektiren sorgularda sorun olur).
+        pass
     return conn
 
 
@@ -64,6 +71,8 @@ def ensure_schema(conn):
         # pgvector extension'ı açıkça public schema'ya kur (search_path güvenliği)
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;")
         cur.execute("SET search_path TO public;")
+        # Extension kurulduktan sonra vector tipini bu bağlantıya kaydet
+        register_vector(conn)
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS memory (
