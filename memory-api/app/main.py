@@ -57,12 +57,10 @@ def get_conn():
     conn = psycopg.connect(DATABASE_URL, autocommit=False)
     try:
         register_vector(conn)
-    except Exception:
-        # vector extension henüz kurulmamış olabilir; ensure_schema() kuracak
-        # ve sonra register_vector'ı tekrar çağıracak. Bu bağlantıda tip
-        # kaydı olmadan da sorgu yapılabilir (yalnızca vector tipi çözümlemesi
-        # gerektiren sorgularda sorun olur).
-        pass
+    except Exception as e:
+        # vector extension henüz kurulmamış olabilir; ensure_schema() kuracak.
+        # SQL'de ::vector cast kullanıldığı için adapter'sız da çalışır.
+        logger.warning("register_vector başarısız (%s) — ::vector cast ile devam", e)
     return conn
 
 
@@ -358,7 +356,7 @@ def create_memory(item: MemoryCreate, _: str = Depends(require_key)):
                 """
                 INSERT INTO memory (project_id, domain, type, content, summary, source, agent,
                                     importance, confidence, tags, embedding, persist, ttl)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::vector,%s,%s)
                 RETURNING id
                 """,
                 (item.project_id, item.domain, item.type, item.content, item.summary,
@@ -410,7 +408,7 @@ def search_memory(item: MemorySearch, _: str = Depends(require_key)):
                 f"""
                 SELECT id, project_id, domain, type, content, summary, source, agent,
                        created_at, updated_at, importance, confidence, tags, status,
-                       1 - (embedding <=> %s) AS score
+                       1 - (embedding <=> %s::vector) AS score
                 FROM memory
                 WHERE {where}
                 ORDER BY score DESC, importance DESC, updated_at DESC
