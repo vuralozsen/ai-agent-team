@@ -18,7 +18,9 @@ services:
       - dokploy-network
 
   memory-api:
-    image: ghcr.io/vuralozsen/ai-agent-team:memory-api
+    build:
+      context: ./memory-api
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
