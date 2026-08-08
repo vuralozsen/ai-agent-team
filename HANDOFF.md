@@ -57,6 +57,15 @@ MEMORY_API_KEY=<SET_IN_SECRET_ENV>   # Claude için ayrı key
 5. **Secret redaction** — memory API'de secret yazma engeli yok (policy-level). Agentlar sorumlu.
 6. **Dokploy container logs** — MCP'den okunamıyor; panelden bakılır.
 
+## KRİTİK: Dokploy Network Alias Çakışması (2026-08-08 olayı)
+`dokploy-network` paylaşılan external ağ. Bu ağa `postgres`/`redis` gibi generic isimle yeni compose
+eklenirse, o ağdaki diğer servislerin aynı hostname çözümlemesi bozulur (tefas'ın `postgres` hostname'i
+yanlışlıkla shared-memory'nin postgres'ine gitti → `Prisma P1000 Authentication failed`).
+**ÇÖZÜLDÜ**: shared-memory postgres'i `dokploy-network`'ten çıkarıldı; sadece kendi internal ağında.
+memory-api `hermes-net` (hermes-isolated) üzerinden erişiliyor.
+**KURAL**: yeni servisleri `dokploy-network`'e eklerken generic service name kullanma — unique isim
+veya özel external ağ (`hermes-net` gibi) kullan.
+
 ## NEXT PLATFORM SETUP STEPS (Claude Code)
 1. Repo'yu clone et: `git clone https://github.com/vuralozsen/ai-agent-team`
 2. `agents/` + `skills/` + `policies/` içeriğini Claude Code'a bağla (CLAUDE.md veya .claude/agents yapısı).
