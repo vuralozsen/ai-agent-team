@@ -15,8 +15,6 @@ services:
       retries: 10
     networks:
       - shared-memory-internal
-      - dokploy-network
-      - hermes-net
 
   memory-api:
     build:
@@ -39,14 +37,11 @@ services:
       retries: 5
     networks:
       - shared-memory-internal
-      - dokploy-network
       - hermes-net
 
 networks:
   shared-memory-internal:
     driver: bridge
-  dokploy-network:
-    external: true
   hermes-net:
     external: true
     name: hermesorg-hermesorg-fbbmsb_hermes-isolated
