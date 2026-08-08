@@ -267,14 +267,19 @@ def require_key(x_api_key: str = Header(default="")):
 # ---------------------------------------------------------------------------
 @app.on_event("startup")
 def startup():
+    """DB bağlantısı + schema kurulumu. Hata olursa process ölmez; /health'ten görünür."""
     try:
         conn = get_conn()
         ensure_schema(conn)
         conn.close()
+        app.state.startup_error = None
         logger.info("Schema hazır. DB=%s", DATABASE_URL.split("@")[-1])
     except Exception as e:
-        logger.error("Startup DB hatası: %s", e)
-        raise
+        import traceback
+        app.state.startup_error = f"{type(e).__name__}: {e}"
+        logger.error("Startup DB hatası: %s\n%s", e, traceback.format_exc())
+        # Uvicorn exit 3 ile restart loop'a girmemesi için exception'ı yutuyoruz.
+        # /health üzerinden hata görünür; DB gelince tekrar denenir.
 
 
 # ---------------------------------------------------------------------------
@@ -282,7 +287,13 @@ def startup():
 # ---------------------------------------------------------------------------
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "shared-memory-api", "time": datetime.now(timezone.utc).isoformat()}
+    err = getattr(app.state, "startup_error", None)
+    return {
+        "status": "degraded" if err else "ok",
+        "service": "shared-memory-api",
+        "startup_error": err,
+        "time": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @app.get("/ready")
