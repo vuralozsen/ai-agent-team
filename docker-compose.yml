@@ -39,6 +39,28 @@ services:
       - shared-memory-internal
       - hermes-net
 
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    command: >
+      sh -c 'while true; do
+        pg_dump -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} | gzip > /backups/memory_$(date +%Y%m%d_%H%M%S).sql.gz;
+        find /backups -name "memory_*.sql.gz" -mtime +7 -delete;
+        echo "backup done: $(ls /backups | wc -l) files, latest $(ls -t /backups | head -1)";
+        sleep 86400;
+      done'
+    volumes:
+      - shared_memory_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - shared-memory-internal
+
 networks:
   shared-memory-internal:
     driver: bridge
@@ -48,3 +70,4 @@ networks:
 
 volumes:
   shared_memory_pgdata:
+  shared_memory_backups:
