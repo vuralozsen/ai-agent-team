@@ -1,0 +1,20 @@
+# Secrets
+.env
+*.pem
+*.key
+*.p12
+credentials.json
+service-account.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Memory API
+*.log
+memory.db
+
+# OS
+.DS_Store

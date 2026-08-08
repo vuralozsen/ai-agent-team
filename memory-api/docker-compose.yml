@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - shared_memory_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - shared-memory-internal
+      - dokploy-network
+
+  memory-api:
+    image: ghcr.io/vuralozsen/ai-agent-team:memory-api
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - MEMORY_API_KEYS=${MEMORY_API_KEYS}
+      - MEMORY_SERVICE_ID=memory-api
+      - EMBEDDING_API_URL=${EMBEDDING_API_URL}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shared-memory-internal
+      - dokploy-network
+
+networks:
+  shared-memory-internal:
+    driver: bridge
+  dokploy-network:
+    external: true
+
+volumes:
+  shared_memory_pgdata:
