@@ -85,6 +85,20 @@ SessionEnd (otomatik yazma) + gerekince manuel `memctl search`.
 Claude Code tarafı: `memory_hook.py` canlı. Hermes tarafı: eşdeğerini
 SessionStart/End ile sınırlı tutmalı, prompt-başı hook eklememeli.
 
+## GÜNCELLEMELERDEN HABERDAR OLMA (her iki taraf)
+
+Diğer tarafın güncellemesini öğrenmenin tek yolu pasif bekleme değil — **session açılışında otomatik kontrol**:
+
+1. **Memory tarafı:** SessionStart search'ünde karşı tarafın kayıtları önceliklidir
+   (Claude Code → `source=hermes` filtrele; Hermes → `source=claude-code` filtrele).
+2. **Repo tarafı:** Session açılışında `git fetch origin && git log HEAD..origin/main` —
+   yeni commit varsa karşı taraf bir şey eklemiş/güncellemiş demektir; modele
+   "çekilmemiş commit var" uyarısı inject edilir, model isterse pull eder.
+
+Hermes'te eşdeğer mekanizma: görev başlangıcında (a) son `source=claude-code`
+memory kayıtlarını ara, (b) `git fetch` + yeni commit kontrolü yap. İki taraf da
+bunu yaptığı sürece hiçbir güncelleme sessiz kalmaz.
+
 ## HERMES 7/24 ÇALIŞIR — iş dağıtımı
 
 **Hermes (VPS) PC kapalı olsa da çalışır** (Telegram + cron + bot ekibi).
