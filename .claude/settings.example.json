@@ -1,0 +1,34 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/memctl.py search \"$(git -C . rev-parse --abbrev-ref HEAD 2>/dev/null || echo current) gorev basi kontrol\" --limit 5 || true"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/memctl.py write --project $(basename $(pwd)) --domain general --type note --content \"Claude Code oturumu bitti: $(date)\" --summary \"session end\" --agent claude-code --no-persist || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/memctl.py search \"$(echo \"$CLAUDE_PROMPT\" | head -c 200)\" --limit 3 || true"
+          }
+        ]
+      }
+    ]
+  }
+}
