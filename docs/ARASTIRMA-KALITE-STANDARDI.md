@@ -16,11 +16,22 @@ Kaynak: Vural'ın 2026-08-15 Karf&Scoot raporu incelemesi (13 eksiklik tespiti).
 ## K3. KİŞİSEL KONTAK ZORUNLULUĞU
 - info@/sales@ → GENEL etiketi, kabul edilmez.
 - Kişisel kontak kaynakları: LinkedIn, team sayfası, basın bülteni, fuar listeleri, ticaret sicili.
+- **Kontak veritabanları (Apollo.io, PDL, Hunter.io, Lusha):** doğrulanmış kişi (ad+unvan+direkt email+telefon) bul; maske-doğrulanmış (i***@domain) da kabul, etiketle.
+- Unvan bazlı hedefleme: gerçek çalışan listesinden (LinkedIn/Apollo/team) eşleştir; varsayımdan unvan uydurma.
 - Bulunamadıysa: "bulunamadı" + en yakın alternatif (asla uydurma).
+- LinkedIn engelliyse: alternatifler (Apollo/PDL/team/basın/fuar); yoksa DIŞ KISIT + ne zaman denenebilir.
+
+## K3b. KİŞİSEL TELEFON (yüksek değerli görevlerde)
+- Apollo/PDL mobil, fuar katalogları, basın imza blokları, sicil iletişim kayıtları.
+- Bulunamazsa: "kişisel cep yayınlanmıyor" + şirket hattı + alternatif.
 
 ## K4. TİCARET SİCİLİ DOĞRULAMASI
 - Ülkeye göre resmi sicil (KRS/ONRC/CIPC/MCA/CR/CNPJ/Handelsregister...).
 - Sicil no, kuruluş yılı, aktif durum, faaliyet alanı.
+- Bot-korumalıysa: aynalar (Zauba/Tofler/D&B/Kompass/Orbis), site footer/tüzel ad, ticaret odası. Yoksa DOĞRULANAMADI + gerekçe. Top-3 ülke firmaları tüzel doğrulanamıyorsa rapor açıkça belirtir.
+
+## K4b. ÜNVAN BAZLI ÇALIŞAN TARAMASI
+- Karar vericileri gerçek çalışan listesinden çıkar (LinkedIn/team/Apollo/PDL). Varsayımdan unvan uydurma.
 
 ## K5. ÜRÜN-BAYİ EŞLEŞME MATRİSİ
 - Hangi ürün kategorisi hangi bayiye gidecek + portföy uyumu.
@@ -36,6 +47,7 @@ Kaynak: Vural'ın 2026-08-15 Karf&Scoot raporu incelemesi (13 eksiklik tespiti).
 
 ## K9. ÜRETİCİ KURALI
 - Üretim yapan firma distribütör adayı OLAMAZ (GAZEX, Atest Gaz gibi) → ÜRETİCİ etiketi + eleme.
+- **Rakip marka distribütörü de aday OLAMAZ** (MSA/Honeywell/Draeger/Crowcon distribütörü) → RAKİP DISTRIBÜTÖRÜ etiketi + eleme (marka çakışması). Aday tablosunda asla görünmez, sadece eleme logunda.
 
 ## K10. LOJİSTİK OBJEKTİFLİĞİ
 - Objektif ölçütler: mesafe, direkt uçuş, gümrük anlaşması, sevkiyat süresi, maliyet.
@@ -43,6 +55,7 @@ Kaynak: Vural'ın 2026-08-15 Karf&Scoot raporu incelemesi (13 eksiklik tespiti).
 
 ## K11. ÜLKE DERİNLİĞİ (çek listesi yasak)
 - Havuz max 8-10 ülke, hepsi derinleştirilir; derinleştirilemeyen çıkarılır + gerekçe.
+- **EKOSİSTEM > İTHALAT RAKAMI (K11b):** ithalat küçük diye eleme; önce distribütör ekosistemi (aday sayısı, doğrulanmış kontaklar, fuarlar). Ekosistem zenginse ülke kalır (örn. Romanya: küçük ithalat, 10+ distribütör + kontaklar).
 
 ## K12. MEVCUT BAYİ FESİH ANALİZİ
 - Sözleşme bitiş tarihi, fesih bedeli tahmini, geçiş süresi, hazır alternatif, riskler.
