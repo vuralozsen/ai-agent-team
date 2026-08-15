@@ -84,3 +84,13 @@ export MEMORY_API_KEY="<MEMORY_API_KEY>"   # .env'den al, repo'ya yazma
 SessionEnd (otomatik yazma) + gerekince manuel `memctl search`.
 Claude Code tarafı: `memory_hook.py` canlı. Hermes tarafı: eşdeğerini
 SessionStart/End ile sınırlı tutmalı, prompt-başı hook eklememeli.
+
+## HERMES 7/24 ÇALIŞIR — iş dağıtımı
+
+**Hermes (VPS) PC kapalı olsa da çalışır** (Telegram + cron + bot ekibi).
+Detay: `docs/HERMES-SYSTEM.md` — okumadan uzun/önemli görevde Hermes'i tercih et.
+
+**Dağıtım kuralı:**
+- Kod/repo/masaüstü → Claude Code (PC açıkken)
+- Araştırma/içerik/finans/izleme/uzun görev → Hermes'e bırak (kesintisiz)
+- Görev yarıda kalırsa Hermes devralabilir (shared memory'den okur)
