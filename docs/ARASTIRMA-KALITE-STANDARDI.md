@@ -72,3 +72,11 @@ Kaynak: Vural'ın 2026-08-15 Karf&Scoot raporu incelemesi (13 eksiklik tespiti).
 |---|----------|-------|---------|
 | K1 | Doğrulama | ✅/⚠️/❌ | ... |
 ```
+
+## EK KURALLAR (2026-08-15 V2 incelemesi — Vural)
+- **K4b çalışan taraması:** gerçek çalışan listesinden karar verici (Apollo API/web, team sayfası, LinkedIn aynaları, sicil, basın); bulunamazsa açıkça belirt, uydurma.
+- **K4c karar verici modeli:** mikro→sahip, küçük→sahip+satış mdr, orta→satın alma+departman, büyük→bölüm müdürü (CEO değil). Her adayda boyut→model→hedef rol.
+- **K6b firma-firma kıyas:** satış ekibi büyüklüğü, coğrafi erişim, büyük müşteri referansı, portföy uyumu, servis kapasitesi.
+- **K6c satış hikayesi:** teknik özellik → distribütör faydası → müşteri mesajı (örn. MPS™: kalibrasyonsuz=servis maliyeti düşük, 15 yıl=tekrar satış).
+- **K8b aday tablosu temizliği:** DOĞRULANAMADI/ÜRETİCİ/RAKİP DISTRIBÜTÖRÜ etiketli firmalar aday tablosunda olmaz, sadece eleme logunda.
+- **K13b tek kaynak kapatma:** tek kaynak kalan her veriye ikinci kaynak ara; bulunamazsa "TEK KAYNAK (tahmini)" + açıklama.
