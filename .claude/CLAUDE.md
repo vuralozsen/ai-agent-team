@@ -69,3 +69,18 @@ export MEMORY_API_KEY="<MEMORY_API_KEY>"   # .env'den al, repo'ya yazma
 - Emin değilsen YAZMAKTANSA SOR — yanlış projeye kayıt, hiç kayıt olmamasından kötüdür.
 - Tailscale kapalıysa `MEMORY_API_URL` erişilemez → işe devam et ama kullanıcıya
   "shared memory erişilemedi" de, sonra senkronize et.
+
+## KARAR (2026-08-15): UserPromptSubmit hook EKLENMEDİ
+
+`settings.example.json`'daki UserPromptSubmit örneği (her prompt'ta memory search)
+**iki taraf için de kullanılmayacak**. Gerekçe:
+1. SessionStart zaten son kayıtları otomatik yükler — her prompt'ta tekrar arama gereksiz.
+2. Her prompt'ta API çağrısı: gecikme + Tailscale kapalıyken timeout riski.
+3. Embedding hash-tabanlı; kısa promptlarla ("devam", "bakalım") anlamsız sonuç → gürültü.
+4. "Bu iş yapılmış mı?" kontrolü hook zorunluluğu değil **model muhakemesi** işidir:
+   görev yinelenen/önemli görünüyorsa agent kendisi `memctl search` çağırır.
+
+**Uygulanan desen (iki taraf için aynı):** SessionStart (otomatik okuma) +
+SessionEnd (otomatik yazma) + gerekince manuel `memctl search`.
+Claude Code tarafı: `memory_hook.py` canlı. Hermes tarafı: eşdeğerini
+SessionStart/End ile sınırlı tutmalı, prompt-başı hook eklememeli.
