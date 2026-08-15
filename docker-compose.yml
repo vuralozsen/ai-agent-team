@@ -61,6 +61,33 @@ services:
     networks:
       - shared-memory-internal
 
+  # Tailscale serve sidecar - masaüstü (Claude Code) erişimi için.
+  # memory-api'yi SADECE tailnet'te yayınlar; public'e port AÇILMAZ.
+  # Kanıtlanmış pattern: tailscale-tefas-proxy (dokploy-network'te çalışıyor)
+  memory-tailscale:
+    image: tailscale/tailscale:latest
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+      - TS_EXTRA_ARGS=--hostname=memory-serve
+    volumes:
+      - ts_memory_state:/var/lib/tailscale
+    command: >
+      sh -c 'tailscaled --tun=userspace-networking &
+             sleep 3
+             tailscale up --authkey=${TS_AUTHKEY} --hostname=memory-serve
+             sleep 2
+             tailscale serve --bg --https=443 http://memory-api:8000
+             tailscale serve status
+             tail -f /dev/null'
+    depends_on:
+      memory-api:
+        condition: service_healthy
+    networks:
+      - shared-memory-internal
+
 networks:
   shared-memory-internal:
     driver: bridge
@@ -71,3 +98,4 @@ networks:
 volumes:
   shared_memory_pgdata:
   shared_memory_backups:
+  ts_memory_state:
