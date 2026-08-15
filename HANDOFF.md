@@ -118,3 +118,14 @@ curl -s -X POST $MEMORY_API_URL/v1/memory/search \
 
 **Doğrulama:** PC'nden `curl https://memory-serve.tailc29799.ts.net/health` çalışıyorsa
 bağlantı tamam. Hermes bu kaydı audit'te `source=claude-code` olarak görür.
+
+## İKİ YÖNLÜ SENKRONİZASYON (2026-08-15 eklendi)
+
+Claude Code ve Hermes aynı shared memory'yi kullanır. **Aynı işi iki taraf yapmaz:**
+- İşe başlayan ÖNCE kontrol eder: `memctl search "<görev>" --project <id> --limit 5`
+  - Aynı iş yapılmışsa → kullanıcıya söyle: "Bu iş daha önce yapılmış: <özet>"
+- İş bitince KAYDEDER: `memctl write --project <id> --domain ... --type ... --content "..." --agent claude-code`
+- Hermes tarafı aynı kuralı uygular (agent=hermes)
+- Bu sayede: Claude Code bir iş yapınca Hermes onu görür (ve tersi) — "o iş yapılmıştı abi" diyebiliriz.
+
+**Kurallar repo'da:** `.claude/CLAUDE.md` (Claude Code) + Hermes `shared-memory` skill'i
