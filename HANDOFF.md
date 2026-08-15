@@ -82,3 +82,39 @@ veya özel external ağ (`hermes-net` gibi) kullan.
 - Claude Code'un memory'si ile bu Shared Memory birbirinin yerine geçmez:
   - Claude Code native memory: oturum bağlamı.
   - Shared Memory: Claude + Hermes arası paylaşılan proje bilgisi (source of truth).
+
+## TAILNET ERİŞİMİ (2026-08-15 eklendi)
+
+### Masaüstü (Claude Code) bağlantı bilgileri
+
+**Memory API (tailnet üzerinden):**
+- URL: `https://memory-serve.tailc29799.ts.net/`
+- API Key (Claude): `mem_key_claude_9f3e2b17`
+- Sadece tailnet içinde çalışır — PC'nde Tailscale açık olmalı.
+- Public'e AÇIK DEĞİL — internetten erişilemez (güvenli).
+
+**PC'de Tailscale kurulumu:**
+```bash
+# Tailscale CLI kuruluysa bağlantı testi:
+tailscale status | grep memory-serve
+# Çıktı: memory-serve 100.96.67.32 ...  (görünüyorsa bağlantı var)
+
+# API test:
+curl -s https://memory-serve.tailc29799.ts.net/health -H "X-API-Key: mem_key_claude_9f3e2b17"
+# → {"status":"ok","service":"shared-memory-api",...}
+```
+
+**Claude Code MCP kurulumu (VS Code / terminal):**
+```bash
+export MEMORY_API_URL="https://memory-serve.tailc29799.ts.net"
+export MEMORY_API_KEY="mem_key_claude_9f3e2b17"
+# MCP bridge:
+claude mcp add shared-memory -- python /path/to/ai-agent-team/scripts/memory_mcp.py
+# veya doğrudan REST:
+curl -s -X POST $MEMORY_API_URL/v1/memory/search \
+  -H "X-API-Key: $MEMORY_API_KEY" -H "Content-Type: application/json" \
+  -d '{"query":"proje durumu","project_id":"hermes-org","limit":5}'
+```
+
+**Doğrulama:** PC'nden `curl https://memory-serve.tailc29799.ts.net/health` çalışıyorsa
+bağlantı tamam. Hermes bu kaydı audit'te `source=claude-code` olarak görür.
