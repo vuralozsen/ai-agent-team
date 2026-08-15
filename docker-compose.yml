@@ -75,11 +75,13 @@ services:
     volumes:
       - ts_memory_state:/var/lib/tailscale
     command: >
-      sh -c 'tailscaled --tun=userspace-networking &
+      sh -c 'apk add --no-cache socat >/dev/null 2>&1
+             tailscaled --tun=userspace-networking &
              sleep 3
              tailscale up --authkey=${TS_AUTHKEY} --hostname=memory-serve
              sleep 2
-             tailscale serve --bg --https=443 http://memory-api:8000
+             socat TCP-LISTEN:8000,fork,reuseaddr TCP:memory-api:8000 &
+             tailscale serve --bg --https=443 http://127.0.0.1:8000
              tailscale serve status
              tail -f /dev/null'
     depends_on:
