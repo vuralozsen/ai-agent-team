@@ -158,7 +158,7 @@ def ensure_schema(conn):
 
 
 # ---------------------------------------------------------------------------
-# Embedding (Yuvalandagi: gerçek embedding API'si varsa onu kullanır, yoksa hash fallback)
+# Embedding (gerçek embedding API'si varsa onu kullanır, yoksa hash fallback)
 # ---------------------------------------------------------------------------
 def embed_text(text: str) -> Optional[list]:
     """Embedding üretir.
