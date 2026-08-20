@@ -158,24 +158,41 @@ def ensure_schema(conn):
 
 
 # ---------------------------------------------------------------------------
-# Embedding (hash-based fallback — gerçek LLM embedding'e takılabilir)
+# Embedding (Yuvalandagi: gerçek embedding API'si varsa onu kullanır, yoksa hash fallback)
 # ---------------------------------------------------------------------------
 def embed_text(text: str) -> Optional[list]:
-    """Embedding üretir. API key yoksa deterministic hash embedding (dev/test için)."""
+    """Embedding üretir.
+
+    EMBEDDING_API_URL + EMBEDDING_API_KEY set ise OpenAI-uyumlu /embeddings uç noktasını
+    çağırır (Gemini, NVIDIA vb.). 1536 boyut zorunludur (schema vector(1536)) — bu yüzden
+    `dimensions: 1536` ve model adı her zaman isteğe eklenir. API yoksa deterministic hash
+    fallback (dev/test için).
+    """
     emb = os.getenv("EMBEDDING_API_URL")
     key = os.getenv("EMBEDDING_API_KEY")
+    model = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
+    dims = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
     if emb and key:
         try:
             import urllib.request
 
+            payload = {"input": text, "model": model, "dimensions": dims}
             req = urllib.request.Request(
                 emb,
-                data=json.dumps({"input": text}).encode(),
+                data=json.dumps(payload).encode(),
                 headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
             )
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=12) as resp:
                 data = json.loads(resp.read())
-                return data["data"][0]["embedding"]
+                vector = data["data"][0]["embedding"]
+                # Boyut güvencesi: API istenileni döndürmezse vektörü uyarlama
+                if len(vector) != dims:
+                    logger.warning("Embedding boyutu %d (istenen %d) — hash fallback'e düşme",
+                                   len(vector), dims)
+                    raise ValueError(f"unexpected embedding dim {len(vector)}")
+                # Kosinüs benzerliği için normalize (pgvector cosine_ops ile tutarlı)
+                norm = sum(v * v for v in vector) ** 0.5 or 1.0
+                return [v / norm for v in vector]
         except Exception as e:
             logger.warning("Embedding API çağrılamadı, hash fallback: %s", e)
     # Deterministic 1536-dim fallback (konsistens için normalize edilmiş hash)
