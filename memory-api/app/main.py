@@ -546,8 +546,8 @@ def search_memory(item: MemorySearch, _: str = Depends(require_key)):
                     ORDER BY score DESC, m.importance DESC, m.updated_at DESC
                     LIMIT %s
                     """,
-                    # {where} 3 kez geçer (vec CTE, kw CTE, dış sorgu) → params 3 kopya
-                    (emb, item.query, *params, *params, *params, item.limit),
+                    # SQL metni sırası: vec(emb + where), kw(query + where), dış(where + limit)
+                    (emb, *params, item.query, *params, *params, item.limit),
                 )
             rows = cur.fetchall()
         result = []
