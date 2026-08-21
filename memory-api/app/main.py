@@ -154,54 +154,109 @@ def ensure_schema(conn):
             )
         except Exception as e:
             logger.warning("HNSW index oluşturulamadı (dev ortamı olabilir): %s", e)
+        # --- FTS (keyword) migration: tsvector kolonu + GIN index + backfill ---
+        # Not: trigger yok — tsvector'i uygulama kodu hesaplar (INSERT/UPDATE'te).
+        try:
+            cur.execute("ALTER TABLE memory ADD COLUMN IF NOT EXISTS fts tsvector;")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_memory_fts ON memory USING gin(fts);")
+            cur.execute(
+                "UPDATE memory SET fts = to_tsvector('simple', "
+                "coalesce(content,'') || ' ' || coalesce(summary,'')) "
+                "WHERE fts IS NULL;"
+            )
+        except Exception as e:
+            logger.warning("FTS migration uygulanamadı: %s", e)
     conn.commit()
 
 
 # ---------------------------------------------------------------------------
-# Embedding (gerçek embedding API'si varsa onu kullanır, yoksa hash fallback)
+# Embedding (Gemini native embedContent, task-type'lı; yoksa hash fallback)
 # ---------------------------------------------------------------------------
-def embed_text(text: str) -> Optional[list]:
-    """Embedding üretir.
+def _embed_request(text: str, task_type: str) -> Optional[list]:
+    """Gemini native embedContent v1beta uç noktasına istek atar.
 
-    EMBEDDING_API_URL + EMBEDDING_API_KEY set ise OpenAI-uyumlu /embeddings uç noktasını
-    çağırır (Gemini, NVIDIA vb.). 1536 boyut zorunludur (schema vector(1536)) — bu yüzden
-    `dimensions: 1536` ve model adı her zaman isteğe eklenir. API yoksa deterministic hash
-    fallback (dev/test için).
+    OpenAI-uyumlu /embeddings uç noktası task_type desteklemediği için (400 döner)
+    native Gemini v1beta REST API kullanılır:
+        POST https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent?key={key}
+        body: {"content": {"parts": [{"text": text}]},
+               "taskType": "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY",
+               "outputDimensionality": dims}
+    1536 boyut zorunludur (schema vector(1536)). API yanıtında embedding.values döner,
+    uzunluk dims değilse exception yükseltilir (çağıran hash fallback'e düşer).
     """
-    emb = os.getenv("EMBEDDING_API_URL")
     key = os.getenv("EMBEDDING_API_KEY")
     model = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
     dims = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
-    if emb and key:
-        try:
-            import urllib.request
+    if not key:
+        return None
+    try:
+        import urllib.request
 
-            payload = {"input": text, "model": model, "dimensions": dims}
-            req = urllib.request.Request(
-                emb,
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
-            )
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                data = json.loads(resp.read())
-                vector = data["data"][0]["embedding"]
-                # Boyut güvencesi: API istenileni döndürmezse vektörü uyarlama
-                if len(vector) != dims:
-                    logger.warning("Embedding boyutu %d (istenen %d) — hash fallback'e düşme",
-                                   len(vector), dims)
-                    raise ValueError(f"unexpected embedding dim {len(vector)}")
-                # Kosinüs benzerliği için normalize (pgvector cosine_ops ile tutarlı)
-                norm = sum(v * v for v in vector) ** 0.5 or 1.0
-                return [v / norm for v in vector]
-        except Exception as e:
-            logger.warning("Embedding API çağrılamadı, hash fallback: %s", e)
-    # Deterministic 1536-dim fallback (konsistens için normalize edilmiş hash)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent?key={key}"
+        payload = {
+            "content": {"parts": [{"text": text}]},
+            "taskType": task_type,
+            "outputDimensionality": dims,
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read())
+            vector = data["embedding"]["values"]
+            # Boyut güvencesi: API istenileni döndürmezse vektörü uyarlama
+            if len(vector) != dims:
+                logger.warning(
+                    "Embedding boyutu %d (istenen %d) — hash fallback'e düşme",
+                    len(vector),
+                    dims,
+                )
+                raise ValueError(f"unexpected embedding dim {len(vector)}")
+            # Kosinüs benzerliği için normalize (pgvector cosine_ops ile tutarlı)
+            norm = sum(v * v for v in vector) ** 0.5 or 1.0
+            return [v / norm for v in vector]
+    except Exception as e:
+        logger.warning("Embedding API çağrılamadı, hash fallback: %s", e)
+    return None
+
+
+def _hash_embedding(text: str) -> list:
+    """Deterministic 1536-dim hash fallback (dev/test için, konsistens için normalize)."""
     vec = []
     for i in range(1536):
         h = hashlib.sha256(f"{text}::{i}".encode()).digest()
         vec.append(int.from_bytes(h[:4], "big") / 2**32 - 0.5)
     norm = sum(v * v for v in vec) ** 0.5 or 1.0
     return [v / norm for v in vec]
+
+
+def embed_document(text: str) -> Optional[list]:
+    """Belge (document) embedding'i üretir (task_type=RETRIEVAL_DOCUMENT).
+
+    EMBEDDING_API_KEY set ise Gemini native embedContent çağırır, değilse hash fallback.
+    """
+    vector = _embed_request(text, "RETRIEVAL_DOCUMENT")
+    if vector is None:
+        return _hash_embedding(text)
+    return vector
+
+
+def embed_query(text: str) -> Optional[list]:
+    """Sorgu (query) embedding'i üretir (task_type=RETRIEVAL_QUERY).
+
+    EMBEDDING_API_KEY set ise Gemini native embedContent çağırır, değilse hash fallback.
+    """
+    vector = _embed_request(text, "RETRIEVAL_QUERY")
+    if vector is None:
+        return _hash_embedding(text)
+    return vector
+
+
+def embed_text(text: str) -> Optional[list]:
+    """Geriye dönük uyumluluk alias'ı — belge embedding'i döndürür."""
+    return embed_document(text)
 
 
 # ---------------------------------------------------------------------------
@@ -247,6 +302,8 @@ class MemorySearch(BaseModel):
     min_importance: float = 0.0
     limit: int = Field(10, ge=1, le=50)
     include_archived: bool = False
+    min_score: float = 0.0  # skoru bunun altında olan sonuçlar atlanır
+    mode: str = "hybrid"    # 'hybrid' | 'semantic' | 'keyword'
 
 
 class MemoryUpdate(BaseModel):
@@ -367,18 +424,20 @@ def create_memory(item: MemoryCreate, _: str = Depends(require_key)):
                 audit(conn, "UPDATE_DEDUP", item.project_id, item.agent, mid)
                 return {"id": str(mid), "deduplicated": True}
 
-            # --- INSERT + embedding ---
-            emb = embed_text(item.content + " " + (item.summary or ""))
+            # --- INSERT + embedding + fts ---
+            emb = embed_document(item.content + " " + (item.summary or ""))
             cur.execute(
                 """
                 INSERT INTO memory (project_id, domain, type, content, summary, source, agent,
-                                    importance, confidence, tags, embedding, persist, ttl)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::vector,%s,%s)
+                                    importance, confidence, tags, embedding, fts, persist, ttl)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::vector,
+                        to_tsvector('simple', coalesce(%s,'') || ' ' || coalesce(%s,'')),
+                        %s,%s)
                 RETURNING id
                 """,
                 (item.project_id, item.domain, item.type, item.content, item.summary,
                  item.source, item.agent, item.importance, item.confidence, item.tags,
-                 emb, item.persist, item.ttl),
+                 emb, item.content, item.summary, item.persist, item.ttl),
             )
             mid = cur.fetchone()[0]
         conn.commit()
@@ -396,9 +455,10 @@ def create_memory(item: MemoryCreate, _: str = Depends(require_key)):
 
 @app.post("/v1/memory/search")
 def search_memory(item: MemorySearch, _: str = Depends(require_key)):
+    conn = None
     try:
         conn = get_conn()
-        emb = embed_text(item.query)
+        emb = embed_query(item.query)
         clauses = ["status = 'current'"]
         params: list[Any] = []
         if item.project_id:
@@ -421,27 +481,99 @@ def search_memory(item: MemorySearch, _: str = Depends(require_key)):
         where = " AND ".join(clauses)
 
         with conn.cursor() as cur:
-            cur.execute(
-                f"""
-                SELECT id, project_id, domain, type, content, summary, source, agent,
-                       created_at, updated_at, importance, confidence, tags, status,
-                       1 - (embedding <=> %s::vector) AS score
-                FROM memory
-                WHERE {where}
-                ORDER BY score DESC, importance DESC, updated_at DESC
-                LIMIT %s
-                """,
-                (emb, *params, item.limit),
-            )
+            # --- Hybrid search: mode'a göre semantic / keyword / RRF birleşimi ---
+            if item.mode == "keyword":
+                # Sadece keyword (FTS): tam terim eşleştirme
+                cur.execute(
+                    f"""
+                    SELECT id, project_id, domain, type, content, summary, source, agent,
+                           created_at, updated_at, importance, confidence, tags, status,
+                           ts_rank_cd(fts, q) AS score
+                    FROM memory, plainto_tsquery('simple', %s) q
+                    WHERE {where} AND fts @@ q
+                    ORDER BY score DESC, importance DESC, updated_at DESC
+                    LIMIT %s
+                    """,
+                    (item.query, *params, item.limit),
+                )
+            elif item.mode == "semantic":
+                # Sadece vektör (eski davranış)
+                cur.execute(
+                    f"""
+                    SELECT id, project_id, domain, type, content, summary, source, agent,
+                           created_at, updated_at, importance, confidence, tags, status,
+                           1 - (embedding <=> %s::vector) AS score
+                    FROM memory
+                    WHERE {where}
+                    ORDER BY score DESC, importance DESC, updated_at DESC
+                    LIMIT %s
+                    """,
+                    (emb, *params, item.limit),
+                )
+            else:
+                # Hybrid: RRF (Reciprocal Rank Fusion)
+                # vec: vektör sıralaması, kw: fts sıralaması
+                # score = 1/(60+vec_rank) + 1/(60+fts_rank); kw boşsa sadece vec terimi.
+                cur.execute(
+                    f"""
+                    WITH vec AS (
+                        SELECT id,
+                               row_number() OVER (
+                                   ORDER BY 1 - (embedding <=> %s::vector) DESC
+                               ) AS vr
+                        FROM memory
+                        WHERE {where}
+                    ),
+                    kw AS (
+                        SELECT m.id,
+                               row_number() OVER (
+                                   ORDER BY ts_rank_cd(m.fts, q) DESC,
+                                            m.importance DESC
+                               ) AS kr
+                        FROM memory m, plainto_tsquery('simple', %s) q
+                        WHERE {where} AND m.fts @@ q
+                    )
+                    SELECT m.id, m.project_id, m.domain, m.type, m.content, m.summary,
+                           m.source, m.agent, m.created_at, m.updated_at,
+                           m.importance, m.confidence, m.tags, m.status,
+                           COALESCE(1.0/(60.0 + v.vr) + 1.0/(60.0 + k.kr),
+                                    1.0/(60.0 + v.vr)) AS score
+                    FROM memory m
+                    LEFT JOIN vec v ON v.id = m.id
+                    LEFT JOIN kw  k ON k.id = m.id
+                    WHERE {where}
+                      AND (v.id IS NOT NULL OR k.id IS NOT NULL)
+                    ORDER BY score DESC, m.importance DESC, m.updated_at DESC
+                    LIMIT %s
+                    """,
+                    (emb, item.query, *params, *params, item.limit),
+                )
             rows = cur.fetchall()
         result = []
         for r in rows:
+            score = float(r[14]) if r[14] is not None else None
+
+            # min_score filtresi: altında kalan sonuçları tamamen at
+            if item.min_score > 0 and (score is None or score < item.min_score):
+                continue
+
+            # relevance bandı
+            if score is None:
+                relevance = "low"
+            elif score >= 0.60:
+                relevance = "high"
+            elif score >= 0.40:
+                relevance = "medium"
+            else:
+                relevance = "low"
+
             result.append({
                 "id": str(r[0]), "project_id": r[1], "domain": r[2], "type": r[3],
                 "content": r[4], "summary": r[5], "source": r[6], "agent": r[7],
                 "created_at": r[8].isoformat(), "updated_at": r[9].isoformat(),
                 "importance": r[10], "confidence": r[11], "tags": r[12], "status": r[13],
-                "score": round(float(r[14]), 4) if r[14] is not None else None,
+                "score": round(score, 4) if score is not None else None,
+                "relevance": relevance,
             })
         return {"results": result, "count": len(result)}
     except Exception as e:
@@ -449,7 +581,8 @@ def search_memory(item: MemorySearch, _: str = Depends(require_key)):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         try:
-            conn.close()
+            if conn is not None:
+                conn.close()
         except Exception:
             pass
 
@@ -497,6 +630,7 @@ def update_memory(memory_id: str, item: MemoryUpdate, _: str = Depends(require_k
         conn = get_conn()
         fields = []
         params: list[Any] = []
+
         if item.content is not None:
             fields.append("content=%s")
             params.append(item.content)
@@ -517,6 +651,11 @@ def update_memory(memory_id: str, item: MemoryUpdate, _: str = Depends(require_k
             params.append(item.status)
         if not fields:
             return {"id": memory_id, "updated": False}
+        # content/summary değiştiyse fts'yi yeniden hesapla (trigger yok, app hesaplar)
+        if item.content is not None or item.summary is not None:
+            fields.append(
+                "fts=to_tsvector('simple', coalesce(content,'') || ' ' || coalesce(summary,''))"
+            )
         fields.append("updated_at=now()")
         with conn.cursor() as cur:
             cur.execute(
