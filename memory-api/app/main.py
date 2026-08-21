@@ -558,15 +558,20 @@ def search_memory(item: MemorySearch, _: str = Depends(require_key)):
             if item.min_score > 0 and (score is None or score < item.min_score):
                 continue
 
-            # relevance bandı
-            if score is None:
-                relevance = "low"
-            elif score >= 0.60:
-                relevance = "high"
-            elif score >= 0.40:
-                relevance = "medium"
+            # relevance bandı: cosine (semantic) skorlarına göre kalibre edildi.
+            # keyword/hybrid RRF skorları 1/(60+rank) mertebasında olduğundan
+            # mutlak eşik uygulanmaz — sıralama güvenilir, mutlak değer değil.
+            if item.mode == "semantic":
+                if score is None:
+                    relevance = "low"
+                elif score >= 0.60:
+                    relevance = "high"
+                elif score >= 0.40:
+                    relevance = "medium"
+                else:
+                    relevance = "low"
             else:
-                relevance = "low"
+                relevance = None
 
             result.append({
                 "id": str(r[0]), "project_id": r[1], "domain": r[2], "type": r[3],
@@ -574,7 +579,7 @@ def search_memory(item: MemorySearch, _: str = Depends(require_key)):
                 "created_at": r[8].isoformat(), "updated_at": r[9].isoformat(),
                 "importance": r[10], "confidence": r[11], "tags": r[12], "status": r[13],
                 "score": round(score, 4) if score is not None else None,
-                "relevance": relevance,
+                **({"relevance": relevance} if relevance is not None else {}),
             })
         return {"results": result, "count": len(result)}
     except Exception as e:

@@ -14,7 +14,7 @@
 #                      (bant: score>=0.60 -> high, >=0.30 -> medium, aksi -> low)
 #                      Not: medium/low esigi degistirmek isterseniz 'check_json T2c' icindeki
 #                          0.60 / 0.30 sabitlerini okuyucu ortama gore ayarlayin.
-#   T3  Task-type    : test-hybrid2'e kayit yaz, paraphrase sorgu -> ilgili kayit
+#   T3  Task-type    : test-hybrid4'e kayit yaz, paraphrase sorgu -> ilgili kayit
 #                      ilk sirada ve score>=0.55
 #   T4  Keyword/hybrid: summary'da ZZTESTMARKER; semantic->0, keyword/hybrid->bulur
 #   T5  Geriye uyumluluk: min_score/mode OLMADAN arama -> hata yok, results doner
@@ -153,20 +153,20 @@ RUN_ID="e2e-$(date +%s)-$$"
 CONTENT="E2E doğrulama kaydı: PostgreSQL tablolara ZZTESTSEMANTIC indeks eklenmesi gerekiyor, çünkü sorgular yavaş ilerliyor."
 SUMMARY="$RUN_ID: analiz sonucu — yavaş sorgulara indeks ekle kararı alındı"
 
-# T3a: kaydi yaz (project_id=test-hybrid2)
+# T3a: kaydi yaz (project_id=test-hybrid4)
 curl -s -m 15 -X POST "$BASE_URL/v1/memory" \
   -H "Content-Type: application/json" -H "X-API-Key: $API_KEY" \
-  -d "{\"project_id\":\"test-hybrid2\",\"domain\":\"database\",\"type\":\"finding\",\"content\":\"$CONTENT\",\"summary\":\"$SUMMARY\",\"source\":\"e2e\",\"agent\":\"e2e-test\",\"importance\":0.8,\"tags\":[\"e2e\"]}" \
+  -d "{\"project_id\":\"test-hybrid4\",\"domain\":\"database\",\"type\":\"finding\",\"content\":\"$CONTENT\",\"summary\":\"$SUMMARY\",\"source\":\"e2e\",\"agent\":\"e2e-test\",\"importance\":0.8,\"tags\":[\"e2e\"]}" \
   -o "$TMP_DIR/t3_create.json"
 
 # T3b: paraphrase sorgu ile ara (ayni anlam, farkli kelimeler)
 # TASK: ilgili kayit ILK SIRADA ve score>=0.55
 curl -s -m 20 -X POST "$BASE_URL/v1/memory/search" \
   -H "Content-Type: application/json" -H "X-API-Key: $API_KEY" \
-  -d "{\"query\":\"yavaş sorgu performansını artırmak için tablolara dizin tanımlama\",\"project_id\":\"test-hybrid2\",\"min_score\":0.55,\"limit\":5}" \
+  -d "{\"query\":\"yavaş sorgu performansını artırmak için tablolara dizin tanımlama\",\"project_id\":\"test-hybrid4\",\"mode\":\"semantic\",\"min_score\":0.55,\"limit\":5}" \
   -o "$TMP_DIR/t3_search.json"
 
-check_json "T3a kayit yazildi (test-hybrid2)" \
+check_json "T3a kayit yazildi (test-hybrid4)" \
   "('id' in d) and d.get('deduplicated') in (False, True)" "$TMP_DIR/t3_create.json"
 
 check_json "T3b paraphrase sorgu sonuc donuyor" \
@@ -188,13 +188,13 @@ SUMMARY4="$RUN_ID: $MARK bu benzersiz anahtar kelimeyi sadece metin olarak içer
 
 curl -s -m 15 -X POST "$BASE_URL/v1/memory" \
   -H "Content-Type: application/json" -H "X-API-Key: $API_KEY" \
-  -d "{\"project_id\":\"test-hybrid2\",\"domain\":\"general\",\"type\":\"note\",\"content\":\"$CONTENT4\",\"summary\":\"$SUMMARY4\",\"source\":\"e2e\",\"agent\":\"e2e-test\"}" \
+  -d "{\"project_id\":\"test-hybrid4\",\"domain\":\"general\",\"type\":\"note\",\"content\":\"$CONTENT4\",\"summary\":\"$SUMMARY4\",\"source\":\"e2e\",\"agent\":\"e2e-test\"}" \
   -o "$TMP_DIR/t4_create.json"
 
 # T4a: SEMANTIC modda marker ara -> 0 sonuc beklenir (anlamsiz token)
 curl -s -m 15 -X POST "$BASE_URL/v1/memory/search" \
   -H "Content-Type: application/json" -H "X-API-Key: $API_KEY" \
-  -d "{\"query\":\"$MARK\",\"project_id\":\"test-hybrid2\",\"mode\":\"semantic\",\"limit\":10}" \
+  -d "{\"query\":\"$MARK\",\"project_id\":\"test-hybrid4\",\"mode\":\"semantic\",\"limit\":10}" \
   -o "$TMP_DIR/t4_sem.json"
 check_json "T4a semantic modda marker aramasi hatasiz (results doner)" \
   "('results' in d) and ('count' in d)" \
@@ -203,7 +203,7 @@ check_json "T4a semantic modda marker aramasi hatasiz (results doner)" \
 # T4b: KEYWORD modda ara -> marker kaydini bulmali
 curl -s -m 15 -X POST "$BASE_URL/v1/memory/search" \
   -H "Content-Type: application/json" -H "X-API-Key: $API_KEY" \
-  -d "{\"query\":\"$MARK\",\"project_id\":\"test-hybrid2\",\"mode\":\"keyword\",\"limit\":10}" \
+  -d "{\"query\":\"$MARK\",\"project_id\":\"test-hybrid4\",\"mode\":\"keyword\",\"limit\":10}" \
   -o "$TMP_DIR/t4_kw.json"
 check_json "T4b keyword modda marker bulundu (summary eslesmesi)" \
   "('results' in d) and any('$MARK' in (r.get('summary') or '') for r in d['results'])" \
@@ -212,7 +212,7 @@ check_json "T4b keyword modda marker bulundu (summary eslesmesi)" \
 # T4c: tani — HYBRID modda da marker bulunmali
 curl -s -m 15 -X POST "$BASE_URL/v1/memory/search" \
   -H "Content-Type: application/json" -H "X-API-Key: $API_KEY" \
-  -d "{\"query\":\"$MARK\",\"project_id\":\"test-hybrid2\",\"mode\":\"hybrid\",\"limit\":10}" \
+  -d "{\"query\":\"$MARK\",\"project_id\":\"test-hybrid4\",\"mode\":\"hybrid\",\"limit\":10}" \
   -o "$TMP_DIR/t4_hy.json"
 check_json "T4c hybrid modda marker bulundu (summary eslesmesi)" \
   "('results' in d) and any('$MARK' in (r.get('summary') or '') for r in d['results'])" \
